@@ -4,14 +4,18 @@ version = "0.1.0"
 authors = ["Stefan Lankes <slankes@eonerc.rwth-aachen.de>"]
 edition = "2021"
 license = "MIT/Apache-2.0"
-publish = false
+readme = "README.md"
+keywords = ["operating systems", "kernel"]
+categories = ["os"]
+repository = "https://github.com/hermit-os/boot-image"
+description = "Extend HermitOS` kernel to a common monolithic operting system."
 
 [dependencies]
 hermit-kernel = { path = "./kernel", default-features = false }
 log = { version = "0.4", default-features = false }
 
 [features]
-default = ["pci", "pci-ids", "fsgsbase", "tcp", "acpi", "syscall"]
+default = ["pci", "pci-ids", "fsgsbase", "smp", "tcp", "udp", "acpi", "syscall", "fuse"]
 syscall = ["hermit-kernel/syscall"]
 vga = ["hermit-kernel/vga"]
 pci = ["hermit-kernel/pci"]
@@ -19,6 +23,6 @@ pci-ids = ["hermit-kernel/pci-ids"]
 acpi = ["hermit-kernel/acpi"]
 fsgsbase = ["hermit-kernel/fsgsbase"]
 smp = ["hermit-kernel/smp"]
-fs = ["hermit-kernel/fs"]
+fuse = ["hermit-kernel/fuse"]
 tcp = ["hermit-kernel/tcp"]
 udp = ["hermit-kernel/udp"]
