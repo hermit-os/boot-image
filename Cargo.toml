@@ -13,6 +13,7 @@ description = "Extend HermitOS` kernel to a common monolithic operting system."
 [dependencies]
 hermit-kernel = { path = "./kernel", default-features = false }
 log = { version = "0.4", default-features = false }
+goblin = { version = "0.8", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
 
 [features]
 default = ["pci", "pci-ids", "fsgsbase", "smp", "tcp", "udp", "acpi", "syscall", "fuse"]
