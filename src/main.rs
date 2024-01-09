@@ -7,18 +7,41 @@ extern crate alloc;
 extern crate hermit;
 
 use alloc::string::String;
+use alloc::vec::Vec;
+use core::ffi::CStr;
 use hermit::fs::{self, readdir, File};
 use hermit::io::{Read, Write};
-use hermit::sys_shutdown;
+use hermit::{sys_close, sys_getdents64, sys_opendir, sys_shutdown, Dirent64};
 
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const u8) {
     info!("Enter main function");
 
     info!("Read content of / with");
-    for i in readdir("/").expect("Unable to read /").iter() {
+    /*for i in readdir("/").expect("Unable to read /").iter() {
         info!("{:?}", *i);
+    }*/
+
+    let fd = sys_opendir("/\0".as_ptr());
+    let mut v: Vec<u8> = Vec::new();
+    v.resize(0x1000, 0);
+    let readlen = sys_getdents64(fd, v.as_mut_ptr() as *mut Dirent64, 0x1000);
+    let mut i = 0;
+    loop {
+        if i >= readlen {
+            break;
+        }
+
+        let dir = unsafe { &*(v.as_ptr().offset(i.try_into().unwrap()) as *const Dirent64) };
+        let name = unsafe {
+            CStr::from_ptr(&dir.d_name as *const _ as *const i8)
+                .to_str()
+                .unwrap()
+        };
+        info!("{}", name);
+        i = i + dir.d_off;
     }
+    sys_close(fd);
 
     info!("Read content of /proc with");
     for i in readdir("/proc").expect("Unable to read /proc").iter() {

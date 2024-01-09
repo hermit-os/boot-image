@@ -15,8 +15,8 @@ hermit-kernel = { path = "./kernel", default-features = false }
 log = { version = "0.4", default-features = false }
 
 [features]
-default = ["pci", "pci-ids", "fsgsbase", "smp", "tcp", "udp", "acpi", "syscall", "fuse"]
-syscall = ["hermit-kernel/syscall"]
+default = ["pci", "pci-ids", "fsgsbase", "smp", "tcp", "udp", "acpi", "common-os", "fuse"]
+common-os = ["hermit-kernel/common-os"]
 vga = ["hermit-kernel/vga"]
 pci = ["hermit-kernel/pci"]
 pci-ids = ["hermit-kernel/pci-ids"]
