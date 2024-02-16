@@ -14,10 +14,12 @@ description = "Extend HermitOS` kernel to a common monolithic operting system."
 hermit-kernel = { path = "./kernel", default-features = false }
 log = { version = "0.4", default-features = false }
 goblin = { version = "0.8", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
+align-address = "0.1"
+num = { version = "0.4", default-features = false }
 
 [features]
-default = ["pci", "pci-ids", "fsgsbase", "smp", "tcp", "udp", "acpi", "syscall", "fuse"]
-syscall = ["hermit-kernel/syscall"]
+default = ["pci", "pci-ids", "fsgsbase", "smp", "tcp", "udp", "acpi", "common-os", "fuse", "dhcpv4"]
+common-os = ["hermit-kernel/common-os"]
 vga = ["hermit-kernel/vga"]
 pci = ["hermit-kernel/pci"]
 pci-ids = ["hermit-kernel/pci-ids"]
@@ -27,3 +29,4 @@ smp = ["hermit-kernel/smp"]
 fuse = ["hermit-kernel/fuse"]
 tcp = ["hermit-kernel/tcp"]
 udp = ["hermit-kernel/udp"]
+dhcpv4 = ["hermit-kernel/dhcpv4"]
