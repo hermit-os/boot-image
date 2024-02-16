@@ -14,8 +14,10 @@ cargo build
 
 ## Booting the kernel
 
+Boot kernel with `cargo run` or use following command
+
 ```sh
-qemu-system-x86_64 -display none -serial stdio -kernel rusty-loader-x86_64 -cpu Skylake-Client -device isa-debug-exit,iobase=0xf4,iosize=0x04 -initrd target/x86_64-unknown-none/debug/boot_image -smp 1 -m 512M
+qemu-system-x86_64 -display none -serial stdio -kernel rusty-loader-x86_64 -cpu Skylake-Client -device isa-debug-exit,iobase=0xf4,iosize=0x04 -smp 1 -m 512M -netdev user,id=u1,hostfwd=tcp::9975-:9975,hostfwd=udp::9975-:9975,net=192.168.76.0/24,dhcpstart=192.168.76.9 -device virtio-net-pci,netdev=u1,disable-legacy=on -initrd data/hello_wolrd
 ```
 
 ## License
