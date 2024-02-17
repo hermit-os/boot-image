@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  merge_group:
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  RUSTFLAGS: -Dwarnings
+  RUSTDOCFLAGS: -Dwarnings
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mkroening/rust-toolchain-toml@main
+      - run: rustup component add clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          workspaces: |
+            .
+      - run: cargo clippy
+
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mkroening/rust-toolchain-toml@main
+      - run: rustup component add rustfmt
+      - run: cargo fmt -- --check
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mkroening/rust-toolchain-toml@main
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          workspaces: |
+            .
+      - name: Build minimal kernel
+        run: |
+          cargo build
+
+  Run:
+    name: Run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install qemu-system-x86
+      - uses: mkroening/rust-toolchain-toml@main
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          workspaces: |
+            .
+      - name: Download loader
+        run: gh release download --repo hermit-os/loader --pattern hermit-loader-x86_64
+      - run: rustup target add x86_64-unknown-none
+      - name: Run loader
+        run: cargo run
+        env:
+          RUSTFLAGS:
