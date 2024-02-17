@@ -9,15 +9,15 @@ extern crate hermit;
 use align_address::Align;
 use alloc::vec::Vec;
 use goblin::elf::program_header::{PT_DYNAMIC, PT_GNU_RELRO, PT_LOAD, PT_TLS};
-use goblin::elf64::dynamic::{DT_RELA, DT_RELASZ, DT_RELAENT};
+use goblin::elf64::dynamic::{DT_RELA, DT_RELAENT, DT_RELASZ};
 use goblin::elf64::reloc::R_386_RELATIVE;
 use goblin::{elf, elf64};
-use hermit::arch::{load_application, jump_to_user_land, BasePageSize, PageSize};
+use hermit::arch::{jump_to_user_land, load_application, BasePageSize, PageSize};
 use hermit::fd::AccessPermission;
 use hermit::fs::{self, create_file, File};
-use hermit::scheduler::{spawn, join, getpid};
-use hermit::scheduler::task::NORMAL_PRIO;
 use hermit::io::Read;
+use hermit::scheduler::task::NORMAL_PRIO;
+use hermit::scheduler::{join, spawn};
 use hermit::sys_shutdown;
 
 static INITD: &[u8] = include_bytes!("../data/hello_world");
@@ -31,13 +31,16 @@ pub enum LoaderError {
 }
 
 fn loader() -> Result<(), LoaderError> {
-    let meta = fs::metadata("/initd").map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
+    let meta = fs::metadata("/initd")
+        .map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
     let len = meta.len();
-    let mut file = File::open("/initd").map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
+    let mut file = File::open("/initd")
+        .map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
 
     let mut buffer: Vec<u8> = Vec::with_capacity(len);
     buffer.resize(len, 0);
-    file.read(&mut buffer).map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
+    file.read(&mut buffer)
+        .map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
     let elf = match elf::Elf::parse(&buffer) {
         Ok(n) => n,
         _ => return Err(LoaderError::ParseError),
@@ -89,7 +92,7 @@ fn loader() -> Result<(), LoaderError> {
         let user_start = code_slice.as_ptr() as u64;
         let mut rela_addr: u64 = 0;
         let mut relasz: u64 = 0;
-        
+
         for i in &elf.program_headers {
             match i.p_type {
                 PT_LOAD => {
@@ -99,20 +102,22 @@ fn loader() -> Result<(), LoaderError> {
                     code_slice[size..size + i.p_filesz as usize].clone_from_slice(
                         &buffer[(i.p_offset as usize)..(i.p_offset + i.p_filesz) as usize],
                     );
-                },
+                }
                 PT_GNU_RELRO => {
                     debug!(
                         "PT_GNU_RELRO at 0x{:x} (size 0x{:x})",
                         i.p_vaddr, i.p_filesz
                     );
-                },
+                }
                 PT_TLS => {
                     debug!("Found TLS at 0x{:x} (size {})", i.p_vaddr, i.p_memsz);
 
                     if let Some(ref mut tls) = tls_slice {
-                        tls[..i.p_filesz as usize].clone_from_slice(&buffer[(i.p_offset as usize)..(i.p_offset + i.p_filesz) as usize]);
+                        tls[..i.p_filesz as usize].clone_from_slice(
+                            &buffer[(i.p_offset as usize)..(i.p_offset + i.p_filesz) as usize],
+                        );
                     }
-                },
+                }
                 PT_DYNAMIC => {
                     debug!("PT_DYNAMIC at 0x{:x} (size 0x{:x})", i.p_vaddr, i.p_filesz);
 
@@ -128,8 +133,8 @@ fn loader() -> Result<(), LoaderError> {
                             debug!("Size of the relocation entry: {}", j.d_val);
                         }
                     }
-                },
-                _ => {},
+                }
+                _ => {}
             }
         }
 
@@ -138,7 +143,8 @@ fn loader() -> Result<(), LoaderError> {
                 elf64::reloc::from_raw_rela(rela_addr as *const elf64::reloc::Rela, relasz as usize)
             };
             for j in rela {
-                let offset = unsafe { code_slice.as_mut_ptr().offset(j.r_offset as isize) as *mut u64 };
+                let offset =
+                    unsafe { code_slice.as_mut_ptr().offset(j.r_offset as isize) as *mut u64 };
 
                 if (j.r_info & 0xF) == R_386_RELATIVE as u64 {
                     unsafe {
@@ -172,6 +178,8 @@ extern "C" fn init_loader(_: usize) {
 
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const u8) {
+    info!("Start user-level process to initialize the HermitOS");
+
     // Mount in-memory file
     unsafe {
         if create_file(
