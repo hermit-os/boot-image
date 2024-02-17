@@ -7,7 +7,7 @@ extern crate alloc;
 extern crate hermit;
 
 use align_address::Align;
-use alloc::vec::Vec;
+use alloc::vec;
 use goblin::elf::program_header::{PT_DYNAMIC, PT_GNU_RELRO, PT_LOAD, PT_TLS};
 use goblin::elf64::dynamic::{DT_RELA, DT_RELAENT, DT_RELASZ};
 use goblin::elf64::reloc::R_386_RELATIVE;
@@ -37,8 +37,7 @@ fn loader() -> Result<(), LoaderError> {
     let mut file = File::open("/initd")
         .map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
 
-    let mut buffer: Vec<u8> = Vec::with_capacity(len);
-    buffer.resize(len, 0);
+    let mut buffer = vec![0; len];
     file.read(&mut buffer)
         .map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
     let elf = match elf::Elf::parse(&buffer) {
@@ -50,7 +49,7 @@ fn loader() -> Result<(), LoaderError> {
         return Err(LoaderError::InvalidElfFile);
     }
 
-    if elf.libraries.len() > 0 {
+    if elf.libraries.is_empty() {
         error!(
             "Error: file depends on following libraries: {:?}",
             elf.libraries
