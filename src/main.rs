@@ -49,7 +49,7 @@ fn loader() -> Result<(), LoaderError> {
         return Err(LoaderError::InvalidElfFile);
     }
 
-    if elf.libraries.is_empty() {
+    if !elf.libraries.is_empty() {
         error!(
             "Error: file depends on following libraries: {:?}",
             elf.libraries
