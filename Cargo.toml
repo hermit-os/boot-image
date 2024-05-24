@@ -18,7 +18,7 @@ align-address = "0.1"
 num = { version = "0.4", default-features = false }
 
 [features]
-default = ["pci", "pci-ids", "fsgsbase", "smp", "tcp", "udp", "acpi", "common-os", "fuse", "dhcpv4"]
+default = ["pci", "pci-ids", "fsgsbase", "smp", "tcp", "udp", "dns", "acpi", "common-os", "fuse", "dhcpv4"]
 common-os = ["hermit-kernel/common-os"]
 vga = ["hermit-kernel/vga"]
 pci = ["hermit-kernel/pci"]
@@ -29,4 +29,9 @@ smp = ["hermit-kernel/smp"]
 fuse = ["hermit-kernel/fuse"]
 tcp = ["hermit-kernel/tcp"]
 udp = ["hermit-kernel/udp"]
+dns = ["hermit-kernel/dns"]
 dhcpv4 = ["hermit-kernel/dhcpv4"]
+
+[patch.crates-io]
+# We need https://github.com/rust-osdev/volatile/pull/61
+volatile = { git = "https://github.com/rust-osdev/volatile.git" }

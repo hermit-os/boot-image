@@ -18,7 +18,7 @@ use hermit::fs::{self, create_file, File};
 use hermit::io::Read;
 use hermit::scheduler::task::NORMAL_PRIO;
 use hermit::scheduler::{join, spawn};
-use hermit::sys_shutdown;
+use hermit::syscalls::shutdown;
 
 static INITD: &[u8] = include_bytes!("../data/hello_world");
 
@@ -198,8 +198,8 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const 
         }
     }
 
-    let id = spawn(init_loader, 0, NORMAL_PRIO, hermit::DEFAULT_STACK_SIZE, -1);
+    let id = unsafe { spawn(init_loader, 0, NORMAL_PRIO, hermit::DEFAULT_STACK_SIZE, -1) };
     let _ = join(id);
 
-    sys_shutdown(0);
+    shutdown(0);
 }
