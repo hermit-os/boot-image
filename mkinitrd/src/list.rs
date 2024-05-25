@@ -26,9 +26,8 @@ pub fn list(path: &Path) -> io::Result<()> {
 
 		println!(
 			"Found file {:?} ({} bytes)",
-			ramdisk_file.path, ramdisk_file.len
+			ramdisk_file.path, ramdisk_file.bin.len()
 		);
-		counter += ramdisk_file.len as usize;
 	}
 
 	Ok(())

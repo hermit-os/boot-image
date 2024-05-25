@@ -1,5 +1,6 @@
 extern crate alloc;
 use alloc::string::String;
+use alloc::vec::Vec;
 
 use bincode::{Decode, Encode};
 
@@ -20,12 +21,12 @@ impl InitRamdiskHeader {
 
 #[derive(Encode, Decode, Debug)]
 pub struct InitRamdiskFile {
-	pub len: u64,
 	pub path: String,
+	pub bin: Vec<u8>,
 }
 
 impl InitRamdiskFile {
-	pub fn new(path: String, len: u64) -> Self {
-		Self { len, path }
+	pub fn new(path: String, bin: Vec<u8>) -> Self {
+		Self { path, bin }
 	}
 }
