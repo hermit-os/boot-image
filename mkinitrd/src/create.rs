@@ -32,7 +32,6 @@ pub fn create(path: &Path) -> io::Result<()> {
 		file.write_all(&buf[..])?;
 
 		visit_dirs(path, &mut |entry| {
-			let metadata = fs::metadata(entry.path()).unwrap();
 			let binding = entry.path();
 			let fname = binding
 				.to_str()
@@ -40,16 +39,13 @@ pub fn create(path: &Path) -> io::Result<()> {
 				.strip_prefix(path.to_str().unwrap())
 				.unwrap();
 
-			let ramdisk_file = InitRamdiskFile::new(fname.to_string(), metadata.len());
-
-			let buf = bincode::encode_to_vec(&ramdisk_file, config).unwrap();
-			file.write_all(&buf[..])?;
-
 			let mut fexec = fs::File::open(entry.path())?;
 			let mut data = vec![];
 			fexec.read_to_end(&mut data)?;
 
-			file.write_all(&data[..])
+			let ramdisk_file = InitRamdiskFile::new(fname.to_string(), data);
+			let buf = bincode::encode_to_vec(&ramdisk_file, config).unwrap();
+			file.write_all(&buf[..])
 		})?;
 	}
 

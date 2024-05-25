@@ -210,22 +210,19 @@ fn mount_initd() {
 	}
 	counter += len;
 
-	let (ramdisk_file, len): (InitRamdiskFile, usize) =
+	let (ramdisk_file, _len): (InitRamdiskFile, usize) =
 		bincode::decode_from_slice(&data[counter..], config).unwrap();
-	counter += len;
 
 	info!("Mount initrd file {} to /initd", ramdisk_file.path);
 
-	let boxed_initd = data[counter..counter + ramdisk_file.len as usize]
-		.to_vec()
-		.into_boxed_slice();
+	let boxed_initd = ramdisk_file.bin.clone().into_boxed_slice();
 	let ptr = Box::into_raw(boxed_initd);
 	// Mount in-memory file
 	unsafe {
 		if create_file(
 			"/initd",
 			ptr as *const u8,
-			ramdisk_file.len.try_into().unwrap(),
+			ramdisk_file.bin.len(),
 			AccessPermission::S_IRUSR
 				| AccessPermission::S_IRGRP
 				| AccessPermission::S_IROTH
