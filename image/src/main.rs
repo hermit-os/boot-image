@@ -17,8 +17,7 @@ use hermit::fd::AccessPermission;
 use hermit::fs::{self, create_file, File};
 use hermit::io::Read;
 use hermit::scheduler::task::NORMAL_PRIO;
-use hermit::scheduler::{join, spawn};
-use hermit::syscalls::shutdown;
+use hermit::scheduler::{join, spawn, shutdown};
 
 static INITD: &[u8] = include_bytes!("../data/hello_world");
 
