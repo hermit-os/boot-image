@@ -1,6 +1,6 @@
-= boot-image
+# boot-image
 
-`boot-image` allows to boot HermitOS` kernel as common monolithic kernel.
+`boot-image` allows to boot HermitOS as common monolithic kernel.
 
 ## Requirements
 
