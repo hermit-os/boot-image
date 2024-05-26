@@ -1,4 +1,3 @@
-//extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 #[macro_use]
@@ -14,7 +13,7 @@ use clap::{arg, Command};
 use std::path::PathBuf;
 
 fn cli() -> Command {
-	pretty_env_logger::init();
+	env_logger::init();
 
 	Command::new(crate_name!())
 		.author(crate_authors!(", "))
