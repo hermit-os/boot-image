@@ -1,8 +1,8 @@
 build:
-	cd image; cargo build
+	cd image; cargo build --release
 
 run: initrd.img
-	cd image; cargo run
+	cd image; cargo run --release
 
 initrd.img:
 	cd mkinitrd; cargo build --release
