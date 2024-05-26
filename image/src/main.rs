@@ -16,7 +16,7 @@ use goblin::elf64::reloc::R_386_RELATIVE;
 use goblin::{elf, elf64};
 use hermit::arch::{jump_to_user_land, load_application, BasePageSize, PageSize};
 use hermit::fd::AccessPermission;
-use hermit::fs::{self, create_file, File};
+use hermit::fs::{self, create_dir, create_file, File};
 use hermit::io::Read;
 use hermit::scheduler::task::NORMAL_PRIO;
 use hermit::scheduler::{join, shutdown, spawn};
@@ -36,10 +36,10 @@ pub enum LoaderError {
 }
 
 fn loader() -> Result<(), LoaderError> {
-	let meta = fs::metadata("/initd")
+	let meta = fs::metadata("/bin/sh")
 		.map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
 	let len = meta.len();
-	let mut file = File::open("/initd")
+	let mut file = File::open("/bin/sh")
 		.map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
 
 	let mut buffer = vec![0; len];
@@ -177,66 +177,46 @@ fn loader() -> Result<(), LoaderError> {
 }
 
 fn mount_initd() {
+	let mut counter = 0;
 	let config = bincode::config::standard();
 
-	// Mount in-memory file
-	unsafe {
-		if create_file(
-			"/initrd",
-			INITD.as_ptr(),
-			INITD.len(),
-			AccessPermission::S_IRUSR
-				| AccessPermission::S_IRGRP
-				| AccessPermission::S_IROTH
-				| AccessPermission::S_IXUSR
-				| AccessPermission::S_IXGRP
-				| AccessPermission::S_IXOTH,
-		)
-		.is_err()
-		{
-			error!("Unable to mount file");
-		}
-	}
-
-	let mut file = File::open("/initrd").unwrap();
-	let mut data = vec![];
-	let mut counter = 0;
-	file.read_to_end(&mut data).unwrap();
+	create_dir("/bin", AccessPermission::from_bits(0o777).unwrap()).expect("Unable to create directory /bin");
 
 	let (header, len): (InitRamdiskHeader, usize) =
-		bincode::decode_from_slice(&data[counter..], config).unwrap();
+		bincode::decode_from_slice(&INITD[counter..], config).unwrap();
 	if header.magic_number != MAGIC_NUMBER {
 		panic!("File isn't a initrd");
 	}
 	counter += len;
 
-	let (ramdisk_file, _len): (InitRamdiskFile, usize) =
-		bincode::decode_from_slice(&data[counter..], config).unwrap();
+	while counter < INITD.len() {
+		let (ramdisk_file, len): (InitRamdiskFile, usize) =
+			bincode::decode_from_slice(&INITD[counter..], config).unwrap();
+		counter += len;
 
-	info!("Mount initrd file {} to /initd", ramdisk_file.path);
+		info!("Mount file to {}", ramdisk_file.path);
 
-	let boxed_initd = ramdisk_file.bin.clone().into_boxed_slice();
-	let ptr = Box::into_raw(boxed_initd);
-	// Mount in-memory file
-	unsafe {
-		if create_file(
-			"/initd",
-			ptr as *const u8,
-			ramdisk_file.bin.len(),
-			AccessPermission::S_IRUSR
-				| AccessPermission::S_IRGRP
-				| AccessPermission::S_IROTH
-				| AccessPermission::S_IXUSR
-				| AccessPermission::S_IXGRP
-				| AccessPermission::S_IXOTH,
-		)
-		.is_err()
-		{
-			error!("Unable to mount file");
+		let boxed_initd = ramdisk_file.bin.clone().into_boxed_slice();
+		let ptr = Box::into_raw(boxed_initd);
+		// Mount in-memory file
+		unsafe {
+			if create_file(
+				&ramdisk_file.path,
+				ptr as *const u8,
+				ramdisk_file.bin.len(),
+				AccessPermission::S_IRUSR
+					| AccessPermission::S_IRGRP
+					| AccessPermission::S_IROTH
+					| AccessPermission::S_IXUSR
+					| AccessPermission::S_IXGRP
+					| AccessPermission::S_IXOTH,
+			)
+			.is_err()
+			{
+				error!("Unable to mount file");
+			}
 		}
 	}
-
-	core::mem::forget(data);
 }
 
 extern "C" fn init_loader(_: usize) {
