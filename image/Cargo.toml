@@ -13,8 +13,8 @@ description = "Extend HermitOS` kernel to a common monolithic operting system."
 [dependencies]
 hermit-kernel = { path = "./kernel", default-features = false }
 log = { version = "0.4", default-features = false }
-goblin = { version = "0.8", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
-align-address = "0.1"
+goblin = { version = "0.9", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
+align-address = "0.3"
 num = { version = "0.4", default-features = false }
 bincode = { git = "https://github.com/bincode-org/bincode.git", tag = "v2.0.0-rc.3", default-features = false, features = ["derive", "alloc", "serde"] }
 
