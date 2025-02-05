@@ -36,11 +36,12 @@ pub enum LoaderError {
 }
 
 fn loader() -> Result<(), LoaderError> {
-	let meta = fs::metadata("/bin/sh")
+	let app = "/bin/hello_world";
+	let meta = fs::metadata(app)
 		.map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
 	let len = meta.len();
-	let mut file = File::open("/bin/sh")
-		.map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
+	let mut file =
+		File::open(app).map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
 
 	let mut buffer = vec![0; len];
 	file.read(&mut buffer)
@@ -172,7 +173,11 @@ fn loader() -> Result<(), LoaderError> {
 	drop(buffer);
 
 	unsafe {
-		jump_to_user_land(entry, exec_size);
+		jump_to_user_land(
+			entry.try_into().unwrap(),
+			exec_size.try_into().unwrap(),
+			&[app],
+		);
 	}
 }
 
@@ -180,7 +185,8 @@ fn mount_initd() {
 	let mut counter = 0;
 	let config = bincode::config::standard();
 
-	create_dir("/bin", AccessPermission::from_bits(0o777).unwrap()).expect("Unable to create directory /bin");
+	create_dir("/bin", AccessPermission::from_bits(0o777).unwrap())
+		.expect("Unable to create directory /bin");
 
 	let (header, len): (InitRamdiskHeader, usize) =
 		bincode::decode_from_slice(&INITD[counter..], config).unwrap();
@@ -196,25 +202,20 @@ fn mount_initd() {
 
 		info!("Mount file to {}", ramdisk_file.path);
 
-		let boxed_initd = ramdisk_file.bin.clone().into_boxed_slice();
-		let ptr = Box::into_raw(boxed_initd);
 		// Mount in-memory file
-		unsafe {
-			if create_file(
-				&ramdisk_file.path,
-				ptr as *const u8,
-				ramdisk_file.bin.len(),
-				AccessPermission::S_IRUSR
-					| AccessPermission::S_IRGRP
-					| AccessPermission::S_IROTH
-					| AccessPermission::S_IXUSR
-					| AccessPermission::S_IXGRP
-					| AccessPermission::S_IXOTH,
-			)
-			.is_err()
-			{
-				error!("Unable to mount file");
-			}
+		if create_file(
+			&ramdisk_file.path,
+			Box::leak(ramdisk_file.bin.into_boxed_slice()),
+			AccessPermission::S_IRUSR
+				| AccessPermission::S_IRGRP
+				| AccessPermission::S_IROTH
+				| AccessPermission::S_IXUSR
+				| AccessPermission::S_IXGRP
+				| AccessPermission::S_IXOTH,
+		)
+		.is_err()
+		{
+			error!("Unable to mount file");
 		}
 	}
 }
