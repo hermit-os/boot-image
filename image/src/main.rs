@@ -36,7 +36,7 @@ pub enum LoaderError {
 }
 
 fn loader() -> Result<(), LoaderError> {
-	let app = "/bin/hello_eduos";
+	let app = "/bin/hello_musl";
 	let meta = fs::metadata(app)
 		.map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
 	let len = meta.len();
