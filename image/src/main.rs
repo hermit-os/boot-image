@@ -36,7 +36,7 @@ pub enum LoaderError {
 }
 
 fn loader() -> Result<(), LoaderError> {
-	let app = "/bin/hello_world";
+	let app = "/bin/hello_eduos";
 	let meta = fs::metadata(app)
 		.map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
 	let len = meta.len();
@@ -164,7 +164,7 @@ fn loader() -> Result<(), LoaderError> {
 
 		Ok(())
 	};
-
+	debug!("loading application");
 	load_application(exec_size, tls_size, elf_reader).map_err(|_| LoaderError::LoadingError)?;
 
 	// After a jump to the user space, the application will
