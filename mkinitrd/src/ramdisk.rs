@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 
 use bincode::{Decode, Encode};
 
-pub const MAGIC_NUMBER: u64 = 0xC0DE4711;
+pub const MAGIC_NUMBER: u64 = 0xc0de4711;
 
 #[derive(Encode, Decode, Debug)]
 pub struct InitRamdiskHeader {

@@ -16,10 +16,11 @@ log = { version = "0.4", default-features = false }
 goblin = { version = "0.9", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
 align-address = "0.3"
 num = { version = "0.4", default-features = false }
-bincode = { git = "https://github.com/bincode-org/bincode.git", tag = "v2.0.0-rc.3", default-features = false, features = ["derive", "alloc", "serde"] }
+bincode = { version = "2.0.1", default-features = false, features = ["derive", "alloc", "serde"] }
+embedded-io = { version = "0.7", features = ["alloc"] }
 
 [features]
-default = ["pci", "pci-ids", "fsgsbase", "smp", "tcp", "udp", "dns", "acpi", "common-os", "fuse", "dhcpv4"]
+default = ["kernel-stack", "pci", "pci-ids", "fsgsbase", "smp", "tcp", "udp", "dns", "acpi", "common-os", "dhcpv4", "virtio-fs", "virtio-net"]
 common-os = ["hermit-kernel/common-os"]
 vga = ["hermit-kernel/vga"]
 pci = ["hermit-kernel/pci"]
@@ -27,11 +28,13 @@ pci-ids = ["hermit-kernel/pci-ids"]
 acpi = ["hermit-kernel/acpi"]
 fsgsbase = ["hermit-kernel/fsgsbase"]
 smp = ["hermit-kernel/smp"]
-fuse = ["hermit-kernel/fuse"]
 tcp = ["hermit-kernel/tcp"]
 udp = ["hermit-kernel/udp"]
 dns = ["hermit-kernel/dns"]
+virtio-fs = ["hermit-kernel/virtio-fs"]
+virtio-net = ["hermit-kernel/virtio-net"]
 dhcpv4 = ["hermit-kernel/dhcpv4"]
+kernel-stack = ["hermit-kernel/kernel-stack"]
 
 [patch.crates-io]
 # We need https://github.com/rust-osdev/volatile/pull/61

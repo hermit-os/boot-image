@@ -10,6 +10,7 @@ use alloc::boxed::Box;
 use alloc::vec;
 
 use align_address::Align;
+use embedded_io::Read;
 use goblin::elf::program_header::{PT_DYNAMIC, PT_GNU_RELRO, PT_LOAD, PT_TLS};
 use goblin::elf64::dynamic::{DT_RELA, DT_RELAENT, DT_RELASZ};
 use goblin::elf64::reloc::R_386_RELATIVE;
@@ -17,7 +18,6 @@ use goblin::{elf, elf64};
 use hermit::arch::{jump_to_user_land, load_application, BasePageSize, PageSize};
 use hermit::fd::AccessPermission;
 use hermit::fs::{self, create_dir, create_file, File};
-use hermit::io::Read;
 use hermit::scheduler::task::NORMAL_PRIO;
 use hermit::scheduler::{join, shutdown, spawn};
 use ramdisk::*;
@@ -37,15 +37,13 @@ pub enum LoaderError {
 
 fn loader() -> Result<(), LoaderError> {
 	let app = "/bin/hello_world";
-	let meta = fs::metadata(app)
-		.map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
+	let meta = fs::metadata(app).map_err(|e| LoaderError::IoError(e.into()))?;
 	let len = meta.len();
-	let mut file =
-		File::open(app).map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
+	let mut file = File::open(app).map_err(|e| LoaderError::IoError(e.into()))?;
 
 	let mut buffer = vec![0; len];
 	file.read(&mut buffer)
-		.map_err(|e| LoaderError::IoError(num::ToPrimitive::to_i32(&e).unwrap()))?;
+		.map_err(|e| LoaderError::IoError(e.into()))?;
 	let elf = match elf::Elf::parse(&buffer) {
 		Ok(n) => n,
 		_ => return Err(LoaderError::ParseError),
@@ -151,12 +149,12 @@ fn loader() -> Result<(), LoaderError> {
 				let offset =
 					unsafe { code_slice.as_mut_ptr().offset(j.r_offset as isize) as *mut u64 };
 
-				if (j.r_info & 0xF) == R_386_RELATIVE as u64 {
+				if (j.r_info & 0xf) == R_386_RELATIVE as u64 {
 					unsafe {
 						*offset = user_start + j.r_addend as u64;
 					}
 				} else {
-					error!("Unsupported relocation type {}", j.r_info & 0xF);
+					error!("Unsupported relocation type {}", j.r_info & 0xf);
 					return Err(());
 				}
 			}
