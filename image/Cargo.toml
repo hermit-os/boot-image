@@ -20,7 +20,7 @@ bincode = { version = "2.0.1", default-features = false, features = ["derive", "
 embedded-io = { version = "0.7", features = ["alloc"] }
 
 [features]
-default = ["kernel-stack", "pci", "pci-ids", "fsgsbase", "smp", "tcp", "udp", "dns", "acpi", "common-os", "dhcpv4", "virtio-fs", "virtio-net"]
+default = ["kernel-stack", "pci", "pci-ids", "fsgsbase", "tcp", "udp", "dns", "acpi", "common-os", "dhcpv4", "virtio-fs", "virtio-net"]
 common-os = ["hermit-kernel/common-os"]
 vga = ["hermit-kernel/vga"]
 pci = ["hermit-kernel/pci"]
