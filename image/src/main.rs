@@ -194,12 +194,19 @@ fn mount_initd() {
 			InitRamdiskFile::decode(&INITD[offset..]).expect("Failed to decode initrd entry");
 		offset += len;
 
-		info!("Mount file to {}", ramdisk_file.path);
+		let decompressed = lz4_flex::decompress_size_prepended(&ramdisk_file.bin)
+			.expect("Failed to decompress initrd entry");
+
+		info!(
+			"Mount file to {} ({} bytes)",
+			ramdisk_file.path,
+			decompressed.len()
+		);
 
 		// Mount in-memory file
 		if create_file(
 			&ramdisk_file.path,
-			Box::leak(ramdisk_file.bin.into_boxed_slice()),
+			Box::leak(decompressed.into_boxed_slice()),
 			AccessPermission::S_IRUSR
 				| AccessPermission::S_IRGRP
 				| AccessPermission::S_IROTH

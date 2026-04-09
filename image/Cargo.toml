@@ -17,6 +17,7 @@ goblin = { version = "0.9", default-features = false, features = ["elf32", "elf6
 align-address = "0.3"
 num = { version = "0.4", default-features = false }
 embedded-io = { version = "0.7", features = ["alloc"] }
+lz4_flex = { version = "0.13", default-features = false, features = ["safe-decode"] }
 
 [features]
 default = ["kernel-stack", "pci", "pci-ids", "fsgsbase", "tcp", "udp", "dns", "acpi", "common-os", "dhcpv4", "virtio-fs", "virtio-net"]

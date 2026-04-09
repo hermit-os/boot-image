@@ -38,8 +38,17 @@ pub fn create(path: &Path) -> io::Result<()> {
 				.unwrap();
 
 			let data = fs::read(entry.path())?;
+			let compressed = lz4_flex::compress_prepend_size(&data);
 
-			let ramdisk_file = InitRamdiskFile::new(fname.to_string(), data);
+			info!(
+				"Adding {} ({} -> {} bytes, {:.0}%)",
+				fname,
+				data.len(),
+				compressed.len(),
+				compressed.len() as f64 / data.len() as f64 * 100.0
+			);
+
+			let ramdisk_file = InitRamdiskFile::new(fname.to_string(), compressed);
 			file.write_all(&ramdisk_file.encode())
 		})?;
 	}

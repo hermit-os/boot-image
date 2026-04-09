@@ -17,10 +17,13 @@ pub fn list(path: &Path) -> io::Result<()> {
 			InitRamdiskFile::decode(&data[offset..]).expect("Failed to decode initrd entry");
 		offset += len;
 
+		let decompressed_size = lz4_flex::decompress_size_prepended(&ramdisk_file.bin)
+			.expect("Failed to decompress")
+			.len();
+
 		println!(
-			"Found file {:?} ({} bytes)",
-			ramdisk_file.path,
-			ramdisk_file.bin.len()
+			"Found file {:?} ({} bytes, compressed {} bytes)",
+			ramdisk_file.path, decompressed_size, ramdisk_file.bin.len()
 		);
 	}
 
