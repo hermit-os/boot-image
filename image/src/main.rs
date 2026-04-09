@@ -6,8 +6,10 @@ extern crate log;
 extern crate alloc;
 extern crate hermit;
 
+use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::vec;
+use core::ffi::{c_char, CStr};
 
 use align_address::Align;
 use embedded_io::Read;
@@ -35,8 +37,9 @@ pub enum LoaderError {
 	LoadingError,
 }
 
-fn loader() -> Result<(), LoaderError> {
-	let app = "/bin/hello_world";
+fn loader(app: &str) -> Result<(), LoaderError> {
+	debug!("Load application {app}");
+
 	let meta = fs::metadata(app).map_err(|e| LoaderError::IoError(e.into()))?;
 	let len = meta.len();
 	let mut file = File::open(app).map_err(|e| LoaderError::IoError(e.into()))?;
@@ -221,8 +224,31 @@ fn mount_initd() {
 	}
 }
 
-extern "C" fn init_loader(_: usize) {
-	let _ = loader().map_err(|e| error!("Unable to load initd: {:?}", e));
+extern "C" fn init_loader(arg: usize) {
+	let app = unsafe { CStr::from_ptr(core::ptr::with_exposed_provenance(arg)) };
+	let app = app.to_str().expect("Invalid UTF-8 in application path");
+	let _ = loader(app).map_err(|e| error!("Unable to load {app}: {e:?}"));
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sys_spawn_process(name: *const c_char) -> i32 {
+	// create CStr in our kernel heap
+	let app = unsafe { CStr::from_ptr(name) }.to_owned();
+	let ptr = app.as_ptr().expose_provenance();
+	core::mem::forget(app);
+
+	let id: i32 = unsafe {
+		spawn(
+			init_loader,
+			ptr,
+			NORMAL_PRIO,
+			hermit::DEFAULT_STACK_SIZE,
+			-1,
+		)
+	}
+	.into();
+
+	id
 }
 
 #[no_mangle] // don't mangle the name of this function
@@ -231,7 +257,16 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const 
 
 	info!("Start user-level process to initialize the HermitOS");
 
-	let id = unsafe { spawn(init_loader, 0, NORMAL_PRIO, hermit::DEFAULT_STACK_SIZE, -1) };
+	let app = c"/bin/spawn";
+	let id = unsafe {
+		spawn(
+			init_loader,
+			app.as_ptr().expose_provenance(),
+			NORMAL_PRIO,
+			hermit::DEFAULT_STACK_SIZE,
+			-1,
+		)
+	};
 	let _ = join(id);
 
 	shutdown(0);
