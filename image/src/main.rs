@@ -180,23 +180,19 @@ fn loader() -> Result<(), LoaderError> {
 }
 
 fn mount_initd() {
-	let mut counter = 0;
-	let config = bincode::config::standard();
-
 	create_dir("/bin", AccessPermission::from_bits(0o777).unwrap())
 		.expect("Unable to create directory /bin");
 
-	let (header, len): (InitRamdiskHeader, usize) =
-		bincode::decode_from_slice(&INITD[counter..], config).unwrap();
+	let (header, mut offset) =
+		InitRamdiskHeader::decode(INITD).expect("Failed to decode initrd header");
 	if header.magic_number != MAGIC_NUMBER {
 		panic!("File isn't a initrd");
 	}
-	counter += len;
 
-	while counter < INITD.len() {
-		let (ramdisk_file, len): (InitRamdiskFile, usize) =
-			bincode::decode_from_slice(&INITD[counter..], config).unwrap();
-		counter += len;
+	while offset < INITD.len() {
+		let (ramdisk_file, len) =
+			InitRamdiskFile::decode(&INITD[offset..]).expect("Failed to decode initrd entry");
+		offset += len;
 
 		info!("Mount file to {}", ramdisk_file.path);
 

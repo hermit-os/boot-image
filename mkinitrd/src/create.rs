@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::Path;
 use std::{fs, io};
 
@@ -24,12 +24,10 @@ pub fn create(path: &Path) -> io::Result<()> {
 	if !path.is_dir() {
 		error!("{} must be a directory!", path.display());
 	} else {
-		let config = bincode::config::standard();
 		let mut file = fs::File::create("initrd.img")?;
 
 		let ramdisk = InitRamdiskHeader::new();
-		let buf: Vec<u8> = bincode::encode_to_vec(&ramdisk, config).unwrap();
-		file.write_all(&buf[..])?;
+		file.write_all(&ramdisk.encode())?;
 
 		visit_dirs(path, &mut |entry| {
 			let binding = entry.path();
@@ -39,13 +37,10 @@ pub fn create(path: &Path) -> io::Result<()> {
 				.strip_prefix(path.to_str().unwrap())
 				.unwrap();
 
-			let mut fexec = fs::File::open(entry.path())?;
-			let mut data = vec![];
-			fexec.read_to_end(&mut data)?;
+			let data = fs::read(entry.path())?;
 
 			let ramdisk_file = InitRamdiskFile::new(fname.to_string(), data);
-			let buf = bincode::encode_to_vec(&ramdisk_file, config).unwrap();
-			file.write_all(&buf[..])
+			file.write_all(&ramdisk_file.encode())
 		})?;
 	}
 

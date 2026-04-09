@@ -1,28 +1,21 @@
-use std::io::Read;
-use std::mem::size_of;
 use std::path::Path;
 use std::{fs, io};
 
 use crate::ramdisk::*;
 
 pub fn list(path: &Path) -> io::Result<()> {
-	let mut file = fs::File::open(path)?;
-	let config = bincode::config::standard();
+	let data = fs::read(path)?;
 
-	let mut data = vec![];
-	file.read_to_end(&mut data)?;
-
-	let (header, len): (InitRamdiskHeader, usize) =
-		bincode::decode_from_slice(&data[..size_of::<InitRamdiskHeader>()], config).unwrap();
+	let (header, mut offset) =
+		InitRamdiskHeader::decode(&data).expect("Failed to decode initrd header");
 	if header.magic_number != MAGIC_NUMBER {
 		panic!("File isn't a initrd");
 	}
 
-	let mut counter = len;
-	while counter < data.len() {
-		let (ramdisk_file, len): (InitRamdiskFile, usize) =
-			bincode::decode_from_slice(&data[counter..], config).unwrap();
-		counter += len;
+	while offset < data.len() {
+		let (ramdisk_file, len) =
+			InitRamdiskFile::decode(&data[offset..]).expect("Failed to decode initrd entry");
+		offset += len;
 
 		println!(
 			"Found file {:?} ({} bytes)",
