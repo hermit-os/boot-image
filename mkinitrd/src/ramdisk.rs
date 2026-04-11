@@ -9,6 +9,12 @@ pub struct InitRamdiskHeader {
 	pub magic_number: u64,
 }
 
+impl Default for InitRamdiskHeader {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 impl InitRamdiskHeader {
 	pub fn new() -> Self {
 		Self {
