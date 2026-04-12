@@ -241,12 +241,12 @@ extern "C" fn init_loader(arg: usize) {
 ///
 /// # Safety
 ///
-/// `name` must be a valid pointer to a NUL-terminated C string that stays
+/// `path` must be a valid pointer to a NUL-terminated C string that stays
 /// readable until this function returns.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn sys_spawn_process(name: *const c_char) -> i32 {
+pub unsafe extern "C" fn sys_spawn_process(path: *const c_char) -> i32 {
 	// create CStr in our kernel heap
-	let app = unsafe { CStr::from_ptr(name) }.to_owned();
+	let app = unsafe { CStr::from_ptr(path) }.to_owned();
 	let ptr = app.as_ptr().expose_provenance();
 	core::mem::forget(app);
 
@@ -264,13 +264,32 @@ pub unsafe extern "C" fn sys_spawn_process(name: *const c_char) -> i32 {
 	id
 }
 
+/// The function sys_exec function replace the current process image
+/// with a new process image.
+///
+/// /// # Safety
+///
+/// `path` must be a valid pointer to a NUL-terminated C string that stays
+/// readable until this function returns.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sys_exec(path: *const c_char) -> i32 {
+	// create CStr in our kernel heap
+	let app = unsafe { CStr::from_ptr(path) }.to_owned();
+	let ptr = app.as_ptr().expose_provenance();
+
+	hermit::arch::clear_user_space();
+	init_loader(ptr);
+
+	0
+}
+
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const u8) {
 	mount_initd();
 
 	info!("Start user-level process to initialize the HermitOS");
 
-	let app = c"/bin/rusty_demo";
+	let app = c"/bin/fork";
 	let id = unsafe {
 		spawn(
 			init_loader,
