@@ -98,6 +98,7 @@ fn loader(app: &str) -> Result<(), LoaderError> {
 		let user_start = code_slice.as_ptr() as u64;
 		let mut rela_addr: u64 = 0;
 		let mut relasz: u64 = 0;
+		let mut tls_init_image: Option<alloc::vec::Vec<u8>> = None;
 
 		for i in &elf.program_headers {
 			match i.p_type {
@@ -118,11 +119,17 @@ fn loader(app: &str) -> Result<(), LoaderError> {
 				PT_TLS => {
 					debug!("Found TLS at 0x{:x} (size {})", i.p_vaddr, i.p_memsz);
 
+					let elf_tls_data =
+						&buffer[(i.p_offset as usize)..(i.p_offset + i.p_filesz) as usize];
+
 					if let Some(ref mut tls) = tls_slice {
-						tls[..i.p_filesz as usize].clone_from_slice(
-							&buffer[(i.p_offset as usize)..(i.p_offset + i.p_filesz) as usize],
-						);
+						tls[..i.p_filesz as usize].clone_from_slice(elf_tls_data);
 					}
+
+					let tls_memsz = i.p_memsz.align_up(i.p_align) as usize;
+					let mut init = alloc::vec![0u8; tls_memsz];
+					init[..elf_tls_data.len()].copy_from_slice(elf_tls_data);
+					tls_init_image = Some(init);
 				}
 				PT_DYNAMIC => {
 					debug!("PT_DYNAMIC at 0x{:x} (size 0x{:x})", i.p_vaddr, i.p_filesz);
@@ -163,7 +170,7 @@ fn loader(app: &str) -> Result<(), LoaderError> {
 			}
 		}
 
-		Ok(())
+		Ok(tls_init_image)
 	};
 
 	load_application(exec_size, tls_size, elf_reader).map_err(|_| LoaderError::LoadingError)?;
@@ -230,8 +237,14 @@ extern "C" fn init_loader(arg: usize) {
 	let _ = loader(app).map_err(|e| error!("Unable to load {app}: {e:?}"));
 }
 
+/// Spawn a new process by loading the binary at `name`.
+///
+/// # Safety
+///
+/// `name` must be a valid pointer to a NUL-terminated C string that stays
+/// readable until this function returns.
 #[unsafe(no_mangle)]
-pub extern "C" fn sys_spawn_process(name: *const c_char) -> i32 {
+pub unsafe extern "C" fn sys_spawn_process(name: *const c_char) -> i32 {
 	// create CStr in our kernel heap
 	let app = unsafe { CStr::from_ptr(name) }.to_owned();
 	let ptr = app.as_ptr().expose_provenance();
@@ -257,7 +270,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const 
 
 	info!("Start user-level process to initialize the HermitOS");
 
-	let app = c"/bin/spawn";
+	let app = c"/bin/rusty_demo";
 	let id = unsafe {
 		spawn(
 			init_loader,
