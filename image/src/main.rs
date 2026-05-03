@@ -14,8 +14,11 @@ use core::ffi::{c_char, CStr};
 use align_address::Align;
 use embedded_io::Read;
 use goblin::elf::program_header::{PT_DYNAMIC, PT_GNU_RELRO, PT_LOAD, PT_TLS};
+#[cfg(target_arch = "aarch64")]
+use goblin::elf::reloc::{R_AARCH64_NONE, R_AARCH64_RELATIVE};
+#[cfg(target_arch = "x86_64")]
+use goblin::elf::reloc::{R_X86_64_NONE, R_X86_64_RELATIVE};
 use goblin::elf64::dynamic::{DT_RELA, DT_RELAENT, DT_RELASZ};
-use goblin::elf64::reloc::R_386_RELATIVE;
 use goblin::{elf, elf64};
 use hermit::arch::{jump_to_user_land, load_application, BasePageSize, PageSize};
 use hermit::fd::AccessPermission;
@@ -23,6 +26,13 @@ use hermit::fs::{self, create_dir, create_file, File};
 use hermit::scheduler::task::NORMAL_PRIO;
 use hermit::scheduler::{join, shutdown, spawn};
 use ramdisk::*;
+
+#[cfg(target_arch = "x86_64")]
+const EXPECTED_MACHINE: u16 = goblin::elf::header::EM_X86_64;
+#[cfg(target_arch = "aarch64")]
+const EXPECTED_MACHINE: u16 = goblin::elf::header::EM_AARCH64;
+#[cfg(target_arch = "riscv64")]
+const EXPECTED_MACHINE: u16 = goblin::elf::header::EM_RISCV;
 
 static INITD: &[u8] = include_bytes!("../../initrd.img");
 
@@ -34,6 +44,7 @@ pub enum LoaderError {
 	IoError(i32),
 	ParseError,
 	InvalidElfFile,
+	UnsupportedArchitecture,
 	LoadingError,
 }
 
@@ -51,6 +62,14 @@ fn loader(app: &str) -> Result<(), LoaderError> {
 		Ok(n) => n,
 		_ => return Err(LoaderError::ParseError),
 	};
+
+	if elf.header.e_machine != EXPECTED_MACHINE {
+		error!(
+			"Wrong architecture: e_machine = 0x{:x}, expected 0x{:x}",
+			elf.header.e_machine, EXPECTED_MACHINE
+		);
+		return Err(LoaderError::UnsupportedArchitecture);
+	}
 
 	if !elf.is_64 {
 		return Err(LoaderError::InvalidElfFile);
@@ -158,14 +177,27 @@ fn loader(app: &str) -> Result<(), LoaderError> {
 			for j in rela {
 				let offset =
 					unsafe { code_slice.as_mut_ptr().offset(j.r_offset as isize) as *mut u64 };
+				let r_type = (j.r_info & 0xffff_ffff) as u32;
 
-				if (j.r_info & 0xf) == R_386_RELATIVE as u64 {
-					unsafe {
+				match r_type {
+					#[cfg(target_arch = "aarch64")]
+					R_AARCH64_RELATIVE => unsafe {
 						*offset = user_start + j.r_addend as u64;
+					},
+					#[cfg(target_arch = "aarch64")]
+					R_AARCH64_NONE => {} // no-op
+
+					#[cfg(target_arch = "x86_64")]
+					R_X86_64_RELATIVE => unsafe {
+						*offset = user_start + j.r_addend as u64;
+					},
+					#[cfg(target_arch = "x86_64")]
+					R_X86_64_NONE => {}
+
+					other => {
+						error!("Unsupported relocation type {other}");
+						return Err(());
 					}
-				} else {
-					error!("Unsupported relocation type {}", j.r_info & 0xf);
-					return Err(());
 				}
 			}
 		}
@@ -267,7 +299,7 @@ pub unsafe extern "C" fn sys_spawn_process(path: *const c_char) -> i32 {
 /// The function sys_exec function replace the current process image
 /// with a new process image.
 ///
-/// /// # Safety
+/// # Safety
 ///
 /// `path` must be a valid pointer to a NUL-terminated C string that stays
 /// readable until this function returns.
