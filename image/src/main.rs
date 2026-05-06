@@ -48,7 +48,9 @@ pub enum LoaderError {
 	LoadingError,
 }
 
-fn loader(app: &str) -> Result<(), LoaderError> {
+fn loader(app: &CStr) -> Result<(), LoaderError> {
+	let app = app.to_str().expect("Invalid UTF-8 in application path");
+
 	debug!("Load application {app}");
 
 	let meta = fs::metadata(app).map_err(|e| LoaderError::IoError(e.into()))?;
@@ -118,13 +120,15 @@ fn loader(app: &str) -> Result<(), LoaderError> {
 		let mut rela_addr: u64 = 0;
 		let mut relasz: u64 = 0;
 		let mut tls_init_image: Option<alloc::vec::Vec<u8>> = None;
-
+		let mut bss_start: usize = 0;
+	
 		for i in &elf.program_headers {
 			match i.p_type {
 				PT_LOAD => {
 					debug!("Load code at address 0x{:x}", i.p_vaddr);
 
 					let size = i.p_vaddr as usize;
+					bss_start = core::cmp::max(bss_start, size + i.p_filesz as usize);
 					code_slice[size..size + i.p_filesz as usize].clone_from_slice(
 						&buffer[(i.p_offset as usize)..(i.p_offset + i.p_filesz) as usize],
 					);
@@ -170,6 +174,9 @@ fn loader(app: &str) -> Result<(), LoaderError> {
 			}
 		}
 
+		// clear BBS section
+		code_slice[bss_start..].iter_mut().for_each(|x| *x = 0);
+
 		if rela_addr != 0 && relasz != 0 {
 			let rela = unsafe {
 				elf64::reloc::from_raw_rela(rela_addr as *const elf64::reloc::Rela, relasz as usize)
@@ -211,12 +218,15 @@ fn loader(app: &str) -> Result<(), LoaderError> {
 	// never comeback => release buffers
 	drop(elf);
 	drop(buffer);
+	drop(file);
+
+	let app = vec![app];
 
 	unsafe {
 		jump_to_user_land(
 			entry.try_into().unwrap(),
 			exec_size.try_into().unwrap(),
-			&[app],
+			app,
 		);
 	}
 }
@@ -265,8 +275,7 @@ fn mount_initd() {
 
 extern "C" fn init_loader(arg: usize) {
 	let app = unsafe { CStr::from_ptr(core::ptr::with_exposed_provenance(arg)) };
-	let app = app.to_str().expect("Invalid UTF-8 in application path");
-	let _ = loader(app).map_err(|e| error!("Unable to load {app}: {e:?}"));
+	let _ = loader(app).map_err(|e| error!("Unable to load {app:?}: {e:?}"));
 }
 
 /// Spawn a new process by loading the binary at `name`.
@@ -280,7 +289,6 @@ pub unsafe extern "C" fn sys_spawn_process(path: *const c_char) -> i32 {
 	// create CStr in our kernel heap
 	let app = unsafe { CStr::from_ptr(path) }.to_owned();
 	let ptr = app.as_ptr().expose_provenance();
-	core::mem::forget(app);
 
 	let id: i32 = unsafe {
 		spawn(
@@ -303,14 +311,14 @@ pub unsafe extern "C" fn sys_spawn_process(path: *const c_char) -> i32 {
 ///
 /// `path` must be a valid pointer to a NUL-terminated C string that stays
 /// readable until this function returns.
+#[cfg(feature = "fork")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sys_exec(path: *const c_char) -> i32 {
 	// create CStr in our kernel heap
 	let app = unsafe { CStr::from_ptr(path) }.to_owned();
-	let ptr = app.as_ptr().expose_provenance();
 
 	hermit::arch::clear_user_space();
-	init_loader(ptr);
+	let _ = loader(&app).map_err(|e| error!("Unable to load {app:?}: {e:?}"));
 
 	0
 }
