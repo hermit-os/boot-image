@@ -121,7 +121,7 @@ fn loader(app: &CStr) -> Result<(), LoaderError> {
 		let mut relasz: u64 = 0;
 		let mut tls_init_image: Option<alloc::vec::Vec<u8>> = None;
 		let mut bss_start: usize = 0;
-	
+
 		for i in &elf.program_headers {
 			match i.p_type {
 				PT_LOAD => {
@@ -273,7 +273,7 @@ fn mount_initd() {
 	}
 }
 
-extern "C" fn init_loader(arg: usize) {
+extern "C" fn loader_entry(arg: usize) {
 	let app = unsafe { CStr::from_ptr(core::ptr::with_exposed_provenance(arg)) };
 	let _ = loader(app).map_err(|e| error!("Unable to load {app:?}: {e:?}"));
 }
@@ -288,12 +288,11 @@ extern "C" fn init_loader(arg: usize) {
 pub unsafe extern "C" fn sys_spawn_process(path: *const c_char) -> i32 {
 	// create CStr in our kernel heap
 	let app = unsafe { CStr::from_ptr(path) }.to_owned();
-	let ptr = app.as_ptr().expose_provenance();
 
 	let id: i32 = unsafe {
 		spawn(
-			init_loader,
-			ptr,
+			loader_entry,
+			app.into_raw() as usize,
 			NORMAL_PRIO,
 			hermit::DEFAULT_STACK_SIZE,
 			-1,
@@ -329,11 +328,11 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const 
 
 	info!("Start user-level process to initialize the HermitOS");
 
-	let app = c"/bin/fork";
+	let app = c"/bin/fork".to_owned();
 	let id = unsafe {
 		spawn(
-			init_loader,
-			app.as_ptr().expose_provenance(),
+			loader_entry,
+			app.into_raw() as usize,
 			NORMAL_PRIO,
 			hermit::DEFAULT_STACK_SIZE,
 			-1,
