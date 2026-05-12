@@ -10,6 +10,7 @@ use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::vec;
 use core::ffi::{c_char, CStr};
+use core::mem;
 
 use align_address::Align;
 use embedded_io::Read;
@@ -18,7 +19,10 @@ use goblin::elf::program_header::{PT_DYNAMIC, PT_GNU_RELRO, PT_LOAD, PT_TLS};
 use goblin::elf::reloc::{R_AARCH64_NONE, R_AARCH64_RELATIVE};
 #[cfg(target_arch = "x86_64")]
 use goblin::elf::reloc::{R_X86_64_NONE, R_X86_64_RELATIVE};
+use goblin::elf::section_header::SHN_UNDEF;
+use goblin::elf::sym::{self, STB_WEAK};
 use goblin::elf64::dynamic::{DT_RELA, DT_RELAENT, DT_RELASZ};
+use goblin::elf64::reloc::{self, R_X86_64_GLOB_DAT};
 use goblin::{elf, elf64};
 use hermit::arch::{jump_to_user_land, load_application, BasePageSize, PageSize};
 use hermit::fd::AccessPermission;
@@ -208,6 +212,32 @@ fn loader(app: &CStr) -> Result<(), LoaderError> {
 					},
 					#[cfg(target_arch = "x86_64")]
 					R_X86_64_NONE => {}
+
+					R_X86_64_GLOB_DAT => {
+						let rela = j;
+
+						let sym = reloc::r_sym(rela.r_info) as usize;
+						let sym = &elf.dynsyms.get(sym).unwrap();
+
+						if sym::st_bind(sym.st_info) == STB_WEAK
+							&& u32::try_from(sym.st_shndx).unwrap() == SHN_UNDEF
+						{
+							let memory = &code_slice[rela.r_offset as usize..][..8];
+							let memory = unsafe { mem::transmute::<&[u8], &[u8]>(memory) };
+							assert_eq!(memory, &[0; 8]);
+							continue;
+						}
+
+						let relocated =
+							(vstart as i64 + sym.st_value as i64 + rela.r_addend).to_ne_bytes();
+						#[cfg(target_arch = "x86_64")]
+						assert_eq!(rela.r_addend, 0);
+						let buf = &relocated[..];
+						// FIXME: Replace with `maybe_uninit_write_slice` once stable
+						let buf = unsafe { mem::transmute::<&[u8], &[u8]>(buf) };
+						code_slice[rela.r_offset as usize..][..mem::size_of_val(&relocated)]
+							.copy_from_slice(buf);
+					}
 
 					other => {
 						error!("Unsupported relocation type {other}");
