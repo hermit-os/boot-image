@@ -223,11 +223,7 @@ fn loader(app: &CStr) -> Result<(), LoaderError> {
 	let app = vec![app];
 
 	unsafe {
-		jump_to_user_land(
-			entry.try_into().unwrap(),
-			exec_size.try_into().unwrap(),
-			app,
-		);
+		jump_to_user_land(entry.try_into().unwrap(), app);
 	}
 }
 
