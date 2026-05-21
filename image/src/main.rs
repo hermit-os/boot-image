@@ -361,7 +361,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const 
 
 	info!("Start user-level process to initialize the HermitOS");
 
-	let app = c"/bin/fork".to_owned();
+	let app = c"/init".to_owned();
 	let id = unsafe {
 		spawn(
 			loader_entry,
