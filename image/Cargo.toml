@@ -41,3 +41,8 @@ fork = ["hermit-kernel/fork"]
 [patch.crates-io]
 # We need https://github.com/rust-osdev/volatile/pull/61
 volatile = { git = "https://github.com/rust-osdev/volatile.git" }
+
+[profile.dist]
+inherits = "release"
+lto = "thin"
+codegen-units = 1
