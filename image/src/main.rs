@@ -55,11 +55,19 @@ fn loader(app: &CStr) -> Result<(), LoaderError> {
 
 	let meta = fs::metadata(app).map_err(|e| LoaderError::IoError(e.into()))?;
 	let len = meta.len();
-	let mut file = File::open(app).map_err(|e| LoaderError::IoError(e.into()))?;
 
+	// Scope the `File` so it is dropped (closing the loader's fd) *before*
+	// `load_application` installs the new process's object_map. Otherwise
+	// the loader's file would happen to occupy fd 0 in the still-empty
+	// kernel-loader map; after `load_application` replaces the map with
+	// `[stdin=0, stdout=1, stderr=2]`, the deferred `File::drop` would
+	// `sys_close(0)` and silently kill the freshly installed stdin slot.
 	let mut buffer = vec![0; len];
-	file.read(&mut buffer)
-		.map_err(|e| LoaderError::IoError(e.into()))?;
+	{
+		let mut file = File::open(app).map_err(|e| LoaderError::IoError(e.into()))?;
+		file.read(&mut buffer)
+			.map_err(|e| LoaderError::IoError(e.into()))?;
+	}
 	let elf = match elf::Elf::parse(&buffer) {
 		Ok(n) => n,
 		_ => return Err(LoaderError::ParseError),
@@ -218,7 +226,6 @@ fn loader(app: &CStr) -> Result<(), LoaderError> {
 	// never comeback => release buffers
 	drop(elf);
 	drop(buffer);
-	drop(file);
 
 	let app = vec![app];
 
