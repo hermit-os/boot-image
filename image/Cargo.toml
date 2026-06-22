@@ -12,12 +12,12 @@ description = "Extend HermitOS` kernel to a common monolithic operting system."
 
 [dependencies]
 hermit-kernel = { path = "./kernel", default-features = false }
-log = { version = "0.4", default-features = false }
-goblin = { version = "0.9", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
-align-address = "0.3"
+log = { version = "0.4.33", default-features = false }
+goblin = { version = "0.10", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
+align-address = "0.4"
 num = { version = "0.4", default-features = false }
 embedded-io = { version = "0.7", features = ["alloc"] }
-lz4_flex = { version = "0.13", default-features = false, features = ["safe-decode"] }
+lz4_flex = { version = "0.13.1", default-features = false, features = ["safe-decode"] }
 
 [features]
 default = ["fork", "semihosting", "kernel-stack", "pci", "pci-ids", "fsgsbase", "tcp", "udp", "dns", "acpi", "common-os", "dhcpv4", "virtio-fs", "virtio-net"]
