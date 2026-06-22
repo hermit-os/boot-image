@@ -20,11 +20,12 @@ use goblin::elf::reloc::{R_AARCH64_NONE, R_AARCH64_RELATIVE};
 use goblin::elf::reloc::{R_X86_64_NONE, R_X86_64_RELATIVE};
 use goblin::elf64::dynamic::{DT_RELA, DT_RELAENT, DT_RELASZ};
 use goblin::{elf, elf64};
-use hermit::arch::{jump_to_user_land, load_application, BasePageSize, PageSize};
+use hermit::common_os::{jump_to_user_land, load_application};
 use hermit::fd::AccessPermission;
 use hermit::fs::{self, create_dir, create_file, File};
 use hermit::scheduler::task::NORMAL_PRIO;
 use hermit::scheduler::{join, shutdown, spawn};
+use hermit::arch::{PageSize, BasePageSize};
 use ramdisk::*;
 
 #[cfg(target_arch = "x86_64")]
@@ -297,7 +298,7 @@ pub unsafe extern "C" fn sys_spawn_process(path: *const c_char) -> i32 {
 			loader_entry,
 			app.into_raw() as usize,
 			NORMAL_PRIO,
-			hermit::DEFAULT_STACK_SIZE,
+			hermit::config::DEFAULT_STACK_SIZE,
 			-1,
 		)
 	}
@@ -337,7 +338,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const 
 			loader_entry,
 			app.into_raw() as usize,
 			NORMAL_PRIO,
-			hermit::DEFAULT_STACK_SIZE,
+			hermit::config::DEFAULT_STACK_SIZE,
 			-1,
 		)
 	};

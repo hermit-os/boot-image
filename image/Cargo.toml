@@ -20,7 +20,7 @@ embedded-io = { version = "0.7", features = ["alloc"] }
 lz4_flex = { version = "0.13", default-features = false, features = ["safe-decode"] }
 
 [features]
-default = ["fork", "semihosting", "kernel-stack", "pci", "pci-ids", "fsgsbase", "tcp", "udp", "dns", "acpi", "common-os", "dhcpv4", "virtio-fs", "virtio-net", "kpti"]
+default = ["fork", "semihosting", "kernel-stack", "pci", "pci-ids", "fsgsbase", "tcp", "udp", "dns", "acpi", "common-os", "dhcpv4", "virtio-fs", "virtio-net"]
 common-os = ["hermit-kernel/common-os"]
 vga = ["hermit-kernel/vga"]
 pci = ["hermit-kernel/pci"]
@@ -37,7 +37,6 @@ dhcpv4 = ["hermit-kernel/dhcpv4"]
 kernel-stack = ["hermit-kernel/kernel-stack"]
 semihosting = ["hermit-kernel/semihosting"]
 fork = ["hermit-kernel/fork"]
-kpti = ["hermit-kernel/kpti"]
 
 [patch.crates-io]
 # We need https://github.com/rust-osdev/volatile/pull/61
