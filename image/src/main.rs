@@ -8,7 +8,9 @@ extern crate hermit;
 
 use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
+use alloc::ffi::CString;
 use alloc::vec;
+use alloc::vec::Vec;
 use core::ffi::{c_char, CStr};
 
 use align_address::Align;
@@ -49,7 +51,7 @@ pub enum LoaderError {
 	LoadingError,
 }
 
-fn loader(app: &CStr) -> Result<(), LoaderError> {
+fn loader(app: &CStr, args: Vec<CString>, envs: Vec<CString>) -> Result<(), LoaderError> {
 	let app = app.to_str().expect("Invalid UTF-8 in application path");
 
 	debug!("Load application {app}");
@@ -228,11 +230,41 @@ fn loader(app: &CStr) -> Result<(), LoaderError> {
 	drop(elf);
 	drop(buffer);
 
-	let app = vec![app];
-
 	unsafe {
-		jump_to_user_land(entry.try_into().unwrap(), app);
+		jump_to_user_land(entry.try_into().unwrap(), args, envs);
 	}
+}
+
+/// Arguments handed from `sys_spawn_process` to `loader_entry`.
+///
+/// All strings are owned copies on the kernel heap, so they stay valid
+/// after the spawning process's user memory is gone.
+struct SpawnArgs {
+	path: CString,
+	args: Vec<CString>,
+	envs: Vec<CString>,
+}
+
+/// Copy a NULL-terminated C string array (`argv`/`envp` convention) from
+/// user memory into owned kernel-heap strings.
+///
+/// # Safety
+///
+/// If non-null, `array` must point to a NULL-terminated array of valid
+/// pointers to NUL-terminated C strings.
+unsafe fn copy_c_str_array(mut array: *const *const c_char) -> Vec<CString> {
+	let mut vec = Vec::new();
+
+	if !array.is_null() {
+		unsafe {
+			while !(*array).is_null() {
+				vec.push(CStr::from_ptr(*array).to_owned());
+				array = array.add(1);
+			}
+		}
+	}
+
+	vec
 }
 
 fn mount_initd() {
@@ -278,25 +310,44 @@ fn mount_initd() {
 }
 
 extern "C" fn loader_entry(arg: usize) {
-	let app = unsafe { CStr::from_ptr(core::ptr::with_exposed_provenance(arg)) };
-	let _ = loader(app).map_err(|e| error!("Unable to load {app:?}: {e:?}"));
+	let spawn_args =
+		unsafe { Box::from_raw(core::ptr::with_exposed_provenance_mut::<SpawnArgs>(arg)) };
+	let SpawnArgs { path, args, envs } = *spawn_args;
+	let _ = loader(&path, args, envs).map_err(|e| error!("Unable to load {path:?}: {e:?}"));
 }
 
-/// Spawn a new process by loading the binary at `name`.
+/// Spawn a new process by loading the binary at `path`.
+///
+/// `argv` and `envp` are optional NULL-terminated arrays of C strings
+/// that become the new process's arguments and environment. If `argv`
+/// is null (or empty), the new process gets `[path]` as its argument
+/// vector.
 ///
 /// # Safety
 ///
-/// `path` must be a valid pointer to a NUL-terminated C string that stays
-/// readable until this function returns.
+/// `path` must be a valid pointer to a NUL-terminated C string; `argv`
+/// and `envp` must each be null or a valid NULL-terminated C string
+/// array. All pointers only have to stay readable until this function
+/// returns — the strings are copied to the kernel heap.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn sys_spawn_process(path: *const c_char) -> i32 {
-	// create CStr in our kernel heap
-	let app = unsafe { CStr::from_ptr(path) }.to_owned();
+pub unsafe extern "C" fn sys_spawn_process(
+	path: *const c_char,
+	argv: *const *const c_char,
+	envp: *const *const c_char,
+) -> i32 {
+	// create owned copies in our kernel heap
+	let path = unsafe { CStr::from_ptr(path) }.to_owned();
+	let mut args = unsafe { copy_c_str_array(argv) };
+	if args.is_empty() {
+		args.push(path.clone());
+	}
+	let envs = unsafe { copy_c_str_array(envp) };
 
+	let spawn_args = Box::new(SpawnArgs { path, args, envs });
 	let id: i32 = unsafe {
 		spawn(
 			loader_entry,
-			app.into_raw() as usize,
+			Box::into_raw(spawn_args) as usize,
 			NORMAL_PRIO,
 			hermit::config::DEFAULT_STACK_SIZE,
 			-1,
@@ -310,18 +361,36 @@ pub unsafe extern "C" fn sys_spawn_process(path: *const c_char) -> i32 {
 /// The function sys_exec function replace the current process image
 /// with a new process image.
 ///
+/// `argv` and `envp` are optional NULL-terminated arrays of C strings
+/// that become the new process image's arguments and environment. If
+/// `argv` is null (or empty), the new image gets `[path]` as its
+/// argument vector.
+///
 /// # Safety
 ///
-/// `path` must be a valid pointer to a NUL-terminated C string that stays
-/// readable until this function returns.
+/// `path` must be a valid pointer to a NUL-terminated C string; `argv`
+/// and `envp` must each be null or a valid NULL-terminated C string
+/// array. All pointers point into the caller's user memory, so they
+/// have to be copied to the kernel heap *before* the old address space
+/// is torn down.
 #[cfg(feature = "fork")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn sys_exec(path: *const c_char) -> i32 {
-	// create CStr in our kernel heap
+pub unsafe extern "C" fn sys_exec(
+	path: *const c_char,
+	argv: *const *const c_char,
+	envp: *const *const c_char,
+) -> i32 {
+	// Create owned copies in our kernel heap. This must happen before
+	// `clear_user_space` unmaps the memory the pointers refer to.
 	let app = unsafe { CStr::from_ptr(path) }.to_owned();
+	let mut args = unsafe { copy_c_str_array(argv) };
+	if args.is_empty() {
+		args.push(app.clone());
+	}
+	let envs = unsafe { copy_c_str_array(envp) };
 
 	hermit::arch::clear_user_space();
-	let _ = loader(&app).map_err(|e| error!("Unable to load {app:?}: {e:?}"));
+	let _ = loader(&app, args, envs).map_err(|e| error!("Unable to load {app:?}: {e:?}"));
 
 	0
 }
@@ -333,10 +402,15 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const 
 	info!("Start user-level process to initialize the HermitOS");
 
 	let app = c"/bin/fork".to_owned();
+	let spawn_args = Box::new(SpawnArgs {
+		args: vec![app.clone()],
+		envs: Vec::new(),
+		path: app,
+	});
 	let id = unsafe {
 		spawn(
 			loader_entry,
-			app.into_raw() as usize,
+			Box::into_raw(spawn_args) as usize,
 			NORMAL_PRIO,
 			hermit::config::DEFAULT_STACK_SIZE,
 			-1,
