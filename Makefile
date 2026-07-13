@@ -8,15 +8,23 @@ else ifeq ($(ARCH),aarch64)
     TARGET = aarch64-unknown-none-softfloat
     # aarch64 uses semihosting shutdown, which returns 0
     EXPECTED_EXIT = 0
+else ifeq ($(ARCH),riscv64)
+    TARGET = riscv64gc-unknown-none-elf
+    # riscv64 shuts down via SBI system reset, which returns 0 (no
+    # semihosting feature — QEMU runs without semihosting support).
+    # PCI and the network stack are not implemented on riscv64 yet,
+    # so the image is built without them.
+    CARGO_FLAGS = --no-default-features --features fork,kernel-stack,common-os
+    EXPECTED_EXIT = 0
 else
-    $(error Unsupported ARCH "$(ARCH)" — use x86_64 or aarch64)
+    $(error Unsupported ARCH "$(ARCH)" — use x86_64, aarch64, or riscv64)
 endif
 
 build:
-	cd image; cargo build --target $(TARGET) --release
+	cd image; cargo build --target $(TARGET) $(CARGO_FLAGS) --release
 
 run: initrd.img
-	cd image; cargo run --target $(TARGET) --release; \
+	cd image; cargo run --target $(TARGET) $(CARGO_FLAGS) --release; \
 	rc=$$?; \
 	if [ $$rc -ne $(EXPECTED_EXIT) ]; \
 	then \

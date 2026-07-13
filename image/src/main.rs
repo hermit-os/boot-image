@@ -18,16 +18,18 @@ use embedded_io::Read;
 use goblin::elf::program_header::{PT_DYNAMIC, PT_GNU_RELRO, PT_LOAD, PT_TLS};
 #[cfg(target_arch = "aarch64")]
 use goblin::elf::reloc::{R_AARCH64_NONE, R_AARCH64_RELATIVE};
+#[cfg(target_arch = "riscv64")]
+use goblin::elf::reloc::{R_RISCV_NONE, R_RISCV_RELATIVE};
 #[cfg(target_arch = "x86_64")]
 use goblin::elf::reloc::{R_X86_64_NONE, R_X86_64_RELATIVE};
 use goblin::elf64::dynamic::{DT_RELA, DT_RELAENT, DT_RELASZ};
 use goblin::{elf, elf64};
+use hermit::arch::{BasePageSize, PageSize};
 use hermit::common_os::{jump_to_user_land, load_application};
 use hermit::fd::AccessPermission;
 use hermit::fs::{self, create_dir, create_file, File};
 use hermit::scheduler::task::NORMAL_PRIO;
 use hermit::scheduler::{join, shutdown, spawn};
-use hermit::arch::{PageSize, BasePageSize};
 use ramdisk::*;
 
 #[cfg(target_arch = "x86_64")]
@@ -204,6 +206,13 @@ fn loader(app: &CStr, args: Vec<CString>, envs: Vec<CString>) -> Result<(), Load
 					},
 					#[cfg(target_arch = "aarch64")]
 					R_AARCH64_NONE => {} // no-op
+
+					#[cfg(target_arch = "riscv64")]
+					R_RISCV_RELATIVE => unsafe {
+						*offset = user_start + j.r_addend as u64;
+					},
+					#[cfg(target_arch = "riscv64")]
+					R_RISCV_NONE => {}
 
 					#[cfg(target_arch = "x86_64")]
 					R_X86_64_RELATIVE => unsafe {
@@ -401,6 +410,11 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const 
 
 	info!("Start user-level process to initialize the HermitOS");
 
+	// `fork` is not implemented on riscv64 yet, so the init process
+	// demonstrates `spawn_process`/`exec` there instead.
+	#[cfg(target_arch = "riscv64")]
+	let app = c"/bin/spawn".to_owned();
+	#[cfg(not(target_arch = "riscv64"))]
 	let app = c"/bin/fork".to_owned();
 	let spawn_args = Box::new(SpawnArgs {
 		args: vec![app.clone()],
