@@ -6,7 +6,7 @@ exec qemu-system-aarch64 \
     -display none -serial stdio \
     -kernel hermit-loader-aarch64 \
     -machine virt,gic-version=3 \
-    -cpu cortex-a72 \
+    -cpu max,lpa2=off \
     -semihosting \
     -smp 1 -m 2G \
     -global virtio-mmio.force-legacy=off \
