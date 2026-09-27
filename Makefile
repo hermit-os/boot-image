@@ -14,7 +14,7 @@ else ifeq ($(ARCH),riscv64)
     # semihosting feature — QEMU runs without semihosting support).
     # PCI and the network stack are not implemented on riscv64 yet,
     # so the image is built without them.
-    CARGO_FLAGS = --no-default-features --features fork,kernel-stack,common-os
+    CARGO_FLAGS = --no-default-features --features loader,fork,kernel-stack,common-os
     EXPECTED_EXIT = 0
 else
     $(error Unsupported ARCH "$(ARCH)" — use x86_64, aarch64, or riscv64)
