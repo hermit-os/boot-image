@@ -1,3 +1,3 @@
 [submodule "kernel"]
 	path = image/kernel
-	url = git@github.com:hermit-os/kernel-private.git
+	url = git@github.com:stlankes/kernel.git
