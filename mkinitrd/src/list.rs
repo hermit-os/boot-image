@@ -23,7 +23,9 @@ pub fn list(path: &Path) -> io::Result<()> {
 
 		println!(
 			"Found file {:?} ({} bytes, compressed {} bytes)",
-			ramdisk_file.path, decompressed_size, ramdisk_file.bin.len()
+			ramdisk_file.path,
+			decompressed_size,
+			ramdisk_file.bin.len()
 		);
 	}
 

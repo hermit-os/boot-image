@@ -410,7 +410,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const 
 
 	info!("Start user-level process to initialize the HermitOS");
 
-	let app = c"/bin/fork".to_owned();
+	let app = c"/bin/pipe".to_owned();
 	let spawn_args = Box::new(SpawnArgs {
 		args: vec![app.clone()],
 		envs: Vec::new(),

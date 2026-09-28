@@ -4,7 +4,7 @@
 # because cargo invokes the runner with the working directory set there.
 exec qemu-system-aarch64 \
     -display none -serial stdio \
-    -kernel hermit-loader-aarch64 \
+    -kernel hermit-loader-aarch64-elf \
     -machine virt,gic-version=3 \
     -cpu max,lpa2=off \
     -semihosting \

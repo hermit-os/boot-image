@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  RUSTDOCFLAGS: -Dwarnings
+
+jobs:
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          lfs: true
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Clippy
+        run: |
+          cd mkinitrd 
+          cargo clippy
+          cd ..
+          ARCH=x86_64 make initrd.img
+          cd image
+          cargo clippy --target=x86_64-unknown-none -- -Dwarnings
+          cd ..
+          rm initrd.img
+          ARCH=aarch64 make initrd.img
+          cd image
+          cargo clippy --target=aarch64-unknown-none-softfloat -- -Dwarnings
+          cd ..
+          rm initrd.img
+          ARCH=riscv64 make initrd.img
+          cd image
+          cargo clippy --target=riscv64gc-unknown-none-elf --no-default-features --features loader,fork,kernel-stack,common-os -- -Dwarnings
+
+  format:
+    name: Format
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy rustfmt
+      - name: Format
+        run: |
+          cd mkinitrd
+          cargo fmt -- --check
+          cd ../image
+          cargo fmt -- --check
+
+  run-hermit:
+    name: Run
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64, riscv64]
+        profile: [dev, release]
+        include:
+          - arch: x86_64
+            packages: qemu-system-x86-hwe
+            flags: --accel --sudo
+          - arch: aarch64
+            packages: qemu-system-arm-hwe
+          - arch: riscv64
+            packages: qemu-system-riscv-hwe
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+          lfs: true
+      - name: Install Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends ipxe-qemu libcap-ng-dev libseccomp-dev ${{ matrix.packages }}
+      - name: Download loader
+        working-directory: ./image
+        run: gh release download --repo hermit-os/loader --pattern 'hermit-loader-${{ matrix.arch }}*'
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run boot-image
+        run: |
+          ARCH=${{ matrix.arch }} make run

@@ -6,15 +6,24 @@ build-std-features = ["compiler-builtins-mem"]
 target = "x86_64-unknown-none"
 
 [target.x86_64-unknown-none]
-runner = "qemu-system-x86_64 -display none -serial stdio -kernel hermit-loader-x86_64 -cpu Skylake-Client -device isa-debug-exit,iobase=0xf4,iosize=0x04 -smp 1 -m 2G -netdev user,id=u1,hostfwd=tcp::9975-:9975,hostfwd=udp::9975-:9975,net=192.168.76.0/24,dhcpstart=192.168.76.9 -device virtio-net-pci,netdev=u1,disable-legacy=on -monitor telnet:127.0.0.1:12345,server,nowait -initrd"
+runner = "qemu-system-x86_64 -display none -serial stdio -kernel hermit-loader-x86_64-multiboot -cpu Skylake-Client -device isa-debug-exit,iobase=0xf4,iosize=0x04 -smp 1 -m 2G -netdev user,id=u1,hostfwd=tcp::9975-:9975,hostfwd=udp::9975-:9975,net=192.168.76.0/24,dhcpstart=192.168.76.9 -device virtio-net-pci,netdev=u1,disable-legacy=on -monitor telnet:127.0.0.1:12345,server,nowait -initrd"
 
 [target.aarch64-unknown-none-softfloat]
 runner = "sh ./qemu-aarch64.sh"
-rustflags = ["-Clink-arg=--image-base=0x40400000"]
+# Link boot_image as a static PIE so the loader can place it anywhere in RAM.
+# The target spec does not enable static PIE, so `-pie` must be passed
+# explicitly; `-Crelocation-model=pic` alone still yields an ET_EXEC
+# linked at lld's default base (0x200000), which is outside of RAM.
+rustflags = [
+    "-Crelocation-model=pic",
+    "-Clink-arg=-pie",
+    "-Clink-arg=--no-dynamic-linker",
+    "-Clink-arg=-ztext",
+]
 
 [target.riscv64gc-unknown-none-elf]
 # Uses QEMU's bundled OpenSBI as the default -bios for the virt machine.
-runner = "qemu-system-riscv64 -machine virt -cpu rv64 -smp 1 -m 2G -display none -serial stdio -kernel hermit-loader-riscv64 -initrd"
+runner = "qemu-system-riscv64 -machine virt -cpu rv64 -smp 1 -m 2G -display none -serial stdio -bios /usr/lib/riscv64-linux-gnu/opensbi/generic/fw_jump.bin -kernel hermit-loader-riscv64-sbi -initrd"
 # RAM on the virt machine starts at 0x8000_0000; OpenSBI occupies the
 # first 512 KiB and the loader sits at 0x8020_0000. Link the kernel
 # image above both (the loader loads ELF segments at their link
