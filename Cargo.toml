@@ -15,12 +15,10 @@ hermit-kernel = { path = "./kernel", default-features = false }
 log = { version = "0.4.33", default-features = false }
 goblin = { version = "0.10", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
 align-address = "0.4"
-num = { version = "0.4", default-features = false }
 embedded-io = { version = "0.7", features = ["alloc"] }
-lz4_flex = { version = "0.13.1", default-features = false, features = ["safe-decode"] }
 
 [features]
-default = ["loader", "fork", "semihosting", "kernel-stack", "pci", "pci-ids", "fsgsbase", "tcp", "udp", "dns", "acpi", "common-os", "dhcpv4", "virtio-fs", "virtio-net"]
+default = ["loader", "fork", "semihosting", "kernel-stack", "pci", "pci-ids", "fsgsbase", "tcp", "udp", "dns", "acpi", "common-os", "dhcpv4", "virtio-fs", "virtio-net", "virtio-rng", "virtio-blk"]
 common-os = ["hermit-kernel/common-os"]
 vga = ["hermit-kernel/vga"]
 pci = ["hermit-kernel/pci"]
@@ -33,6 +31,8 @@ udp = ["hermit-kernel/udp"]
 dns = ["hermit-kernel/dns"]
 virtio-fs = ["hermit-kernel/virtio-fs"]
 virtio-net = ["hermit-kernel/virtio-net"]
+virtio-rng = ["hermit-kernel/virtio-rng"]
+virtio-blk = ["hermit-kernel/virtio-blk"]
 dhcpv4 = ["hermit-kernel/dhcpv4"]
 kernel-stack = ["hermit-kernel/kernel-stack"]
 semihosting = ["hermit-kernel/semihosting"]

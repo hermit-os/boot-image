@@ -26,11 +26,9 @@ use goblin::elf64::dynamic::{DT_RELA, DT_RELAENT, DT_RELASZ};
 use goblin::{elf, elf64};
 use hermit::arch::{BasePageSize, PageSize};
 use hermit::common_os::{jump_to_user_land, load_application};
-use hermit::fd::AccessPermission;
-use hermit::fs::{self, create_dir, create_file, File};
+use hermit::fs::{self, File};
 use hermit::scheduler::task::NORMAL_PRIO;
 use hermit::scheduler::{join, shutdown, spawn};
-use ramdisk::*;
 
 #[cfg(target_arch = "x86_64")]
 const EXPECTED_MACHINE: u16 = goblin::elf::header::EM_X86_64;
@@ -38,11 +36,6 @@ const EXPECTED_MACHINE: u16 = goblin::elf::header::EM_X86_64;
 const EXPECTED_MACHINE: u16 = goblin::elf::header::EM_AARCH64;
 #[cfg(target_arch = "riscv64")]
 const EXPECTED_MACHINE: u16 = goblin::elf::header::EM_RISCV;
-
-static INITD: &[u8] = include_bytes!("../../initrd.img");
-
-#[path = "../../mkinitrd/src/ramdisk.rs"]
-pub mod ramdisk;
 
 #[derive(Debug, PartialEq)]
 pub enum LoaderError {
@@ -276,48 +269,6 @@ unsafe fn copy_c_str_array(mut array: *const *const c_char) -> Vec<CString> {
 	vec
 }
 
-fn mount_initd() {
-	create_dir("/bin", AccessPermission::from_bits(0o777).unwrap())
-		.expect("Unable to create directory /bin");
-
-	let (header, mut offset) =
-		InitRamdiskHeader::decode(INITD).expect("Failed to decode initrd header");
-	if header.magic_number != MAGIC_NUMBER {
-		panic!("File isn't a initrd");
-	}
-
-	while offset < INITD.len() {
-		let (ramdisk_file, len) =
-			InitRamdiskFile::decode(&INITD[offset..]).expect("Failed to decode initrd entry");
-		offset += len;
-
-		let decompressed = lz4_flex::decompress_size_prepended(&ramdisk_file.bin)
-			.expect("Failed to decompress initrd entry");
-
-		info!(
-			"Mount file to {} ({} bytes)",
-			ramdisk_file.path,
-			decompressed.len()
-		);
-
-		// Mount in-memory file
-		if create_file(
-			&ramdisk_file.path,
-			Box::leak(decompressed.into_boxed_slice()),
-			AccessPermission::S_IRUSR
-				| AccessPermission::S_IRGRP
-				| AccessPermission::S_IROTH
-				| AccessPermission::S_IXUSR
-				| AccessPermission::S_IXGRP
-				| AccessPermission::S_IXOTH,
-		)
-		.is_err()
-		{
-			error!("Unable to mount file");
-		}
-	}
-}
-
 extern "C" fn loader_entry(arg: usize) {
 	let spawn_args =
 		unsafe { Box::from_raw(core::ptr::with_exposed_provenance_mut::<SpawnArgs>(arg)) };
@@ -406,9 +357,13 @@ pub unsafe extern "C" fn sys_exec(
 
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _env: *const *const u8) {
-	mount_initd();
-
 	info!("Start user-level process to initialize the HermitOS");
+
+	// The disk image is mounted at /root; make its binaries available at /bin.
+	#[cfg(feature = "virtio-blk")]
+	if let Err(err) = hermit::fs::mount_vfat_dir("bin", "/bin") {
+		error!("Unable to mount /bin: {err:?}");
+	}
 
 	let app = c"/bin/pipe".to_owned();
 	let spawn_args = Box::new(SpawnArgs {
