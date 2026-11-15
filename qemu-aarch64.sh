@@ -12,4 +12,6 @@ exec qemu-system-aarch64 \
     -global virtio-mmio.force-legacy=off \
     -netdev user,id=net0,hostfwd=tcp::9975-:9975,hostfwd=udp::9975-:9975,net=192.168.76.0/24,dhcpstart=192.168.76.9 \
     -device virtio-net-pci,netdev=net0,disable-legacy=on,packed=on,mq=on \
+    -drive file=disk.img,format=raw,if=none,id=hd0 -device virtio-blk-pci,disable-legacy=on,drive=hd0 \
+    -device virtio-rng-pci,disable-legacy=on \
     -device guest-loader,addr=0x48000000,initrd="$1"

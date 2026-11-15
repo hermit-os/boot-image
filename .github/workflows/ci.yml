@@ -24,21 +24,8 @@ jobs:
           components: clippy
       - name: Clippy
         run: |
-          cd mkinitrd 
-          cargo clippy
-          cd ..
-          ARCH=x86_64 make initrd.img
-          cd image
           cargo clippy --target=x86_64-unknown-none -- -Dwarnings
-          cd ..
-          rm initrd.img
-          ARCH=aarch64 make initrd.img
-          cd image
           cargo clippy --target=aarch64-unknown-none-softfloat -- -Dwarnings
-          cd ..
-          rm initrd.img
-          ARCH=riscv64 make initrd.img
-          cd image
           cargo clippy --target=riscv64gc-unknown-none-elf --no-default-features --features loader,fork,kernel-stack,common-os -- -Dwarnings
 
   format:
@@ -54,9 +41,6 @@ jobs:
           components: clippy rustfmt
       - name: Format
         run: |
-          cd mkinitrd
-          cargo fmt -- --check
-          cd ../image
           cargo fmt -- --check
 
   run-hermit:
@@ -82,9 +66,8 @@ jobs:
       - name: Install Packages
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends ipxe-qemu libcap-ng-dev libseccomp-dev ${{ matrix.packages }}
+          sudo apt-get install --no-install-recommends mtools ipxe-qemu libcap-ng-dev libseccomp-dev ${{ matrix.packages }}
       - name: Download loader
-        working-directory: ./image
         run: gh release download --repo hermit-os/loader --pattern 'hermit-loader-${{ matrix.arch }}*'
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

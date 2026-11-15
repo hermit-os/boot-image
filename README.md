@@ -5,14 +5,20 @@ is currently just a _poof of concept_.
 
 ## Requirements
 
-On every platform, you essentially need three things:
+On every platform, you essentially need four things:
 
 1. the Rust toolchain via [`rustup`](https://www.rust-lang.org/tools/install)
 2. QEMU
-3. a POSIX-compatible shell as well as `make` and `git`
+3. [mtools](https://www.gnu.org/software/mtools/) to create the disk image
+   (`apt install mtools` on Debian/Ubuntu, `brew install mtools` on macOS)
+4. a POSIX-compatible shell as well as `make` and `git`
+
+The kernel is included as the Git submodule [`kernel`](kernel), so clone the
+repository with `git clone --recurse-submodules` or run
+`git submodule update --init` afterwards.
 
 The exact nightly version is pinned in
-[`image/rust-toolchain.toml`](image/rust-toolchain.toml) and is installed
+[`rust-toolchain.toml`](rust-toolchain.toml) and is installed
 automatically the first time `cargo` is invoked.
 
 ## Building the boot image
@@ -22,25 +28,42 @@ the architecture with the environment variable `ARCH`. Besides `x86_64`,
 the values `aarch64` and `riscv64` are supported.
 
 ```sh
-ARCH=x86_64 make
+make ARCH=x86_64
 ```
+
+## Disk image
+
+The user-space binaries are not embedded into the boot image. Instead,
+`make disk.img` creates a 128 MiB FAT32 image with the content of
+[`data/<ARCH>`](data). The kernel mounts this image at `/root`, and the boot
+image additionally mounts its directory `bin` at `/bin`. The first process is
+started from `/bin`, see `main` in [`src/main.rs`](src/main.rs).
+
+`make` rebuilds `disk.img` when the binaries in `data/<ARCH>` or the
+architecture change. The size of the image can be changed with the variable
+`DISK_SIZE_MB`.
 
 ## Booting the kernel
 
 Boot the kernel with `ARCH=x86_64 make run` or use the following command:
 
 ```sh
-qemu-system-x86_64 -display none -serial stdio -kernel hermit-loader-x86_64 -cpu Skylake-Client -device isa-debug-exit,iobase=0xf4,iosize=0x04 -smp 1 -m 2G -netdev user,id=u1,hostfwd=tcp::9975-:9975,hostfwd=udp::9975-:9975,net=192.168.76.0/24,dhcpstart=192.168.76.9 -device virtio-net-pci,netdev=u1,disable-legacy=on -initrd image/target/x86_64-unknown-none/release/boot_image
+ARCH=x86_64 make run
 ```
 
-## Initial ramdisk
+`make run` creates the disk image if necessary and starts QEMU through
+`cargo run`. The QEMU command lines are defined as runners in
+[`.cargo/config.toml`](.cargo/config.toml) and, for `aarch64`, in
+[`qemu-aarch64.sh`](qemu-aarch64.sh). The disk image is attached as a
+virtio block device.
 
-If `initrd.img` is missing, `make` creates the ramdisk using the tool
-[`mkinitrd`](mkinitrd). The ramdisk includes all binaries for the architecture `ARCH` from the directory [`data`](data).
-The ramdisk is embedded into the boot image at compile time.
-`make` does not rebuild an existing `initrd.img`, so delete it after changing the binaries in [`data`](data).
+For `riscv64`, the runner expects the OpenSBI firmware at
+`/usr/lib/riscv64-linux-gnu/opensbi/generic/fw_jump.bin`, as provided by the
+Debian/Ubuntu package `opensbi`. On other systems, adjust the path to `-bios`.
 
-To build these binaries, the repository `hermit-rs` is used with the pull request [`970`](https://github.com/hermit-os/hermit-rs/pull/970).
+## User-space binaries
+
+To build the binaries in [`data`](data), the repository `hermit-rs` is used with the pull request [`970`](https://github.com/hermit-os/hermit-rs/pull/970).
 For instance, the `fork` example is built with the following command:
 
 ```sh
