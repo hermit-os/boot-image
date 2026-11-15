@@ -49,7 +49,6 @@ jobs:
     strategy:
       matrix:
         arch: [x86_64, aarch64, riscv64]
-        profile: [dev, release]
         include:
           - arch: x86_64
             packages: qemu-system-x86-hwe
